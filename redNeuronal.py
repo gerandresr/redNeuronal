@@ -6,10 +6,29 @@ Created on Fri Aug 13 09:26:42 2021
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.datasets import make_moons, make_circles
 
-def sigmoid(x):
-    # activation function
+
+def sigmoid(x, deriv=False):
+    if deriv:
+        return x * (1-x)  # para back propagation
     return 1/(1+np.e**(-x))
+
+def tanh(x, deriv=False):
+    if deriv:
+        return (1 - (np.tanh(x))**2)
+    return np.tanh(x)
+
+def mse(Yp, Yr, deriv=False):
+    # error cuadratico medio
+    '''
+    Yp = valor calculado
+    Yr = valor real
+    '''
+    if deriv:
+        return (Yp - Yr)
+    return np.mean((Yp - Yr)**2)
 
 
 class Layer:
@@ -41,10 +60,78 @@ class NeutralNetwork:
             out = z
         return out
 
+    def fit(self, X=[], Y=[], epochs=100, learnRate=0.5):
+
+        for k in range(epochs):
+            out = [(None, X)]
+            
+            for i in range(len(self.model)):
+                z = out[-1][1] @ self.model[i].W + self.model[i].b
+                a = sigmoid(z, deriv=False)
+                out.append((z, a))  # append salida sin activar y activacion
+            
+            deltas = []  # guardamos el error en la funcion de coste
+            
+            for i in reversed(range(len(self.model))):
+                z = out[i+1][0]
+                a = out[i+1][1]
+                
+                if i == len(self.model)-1:
+                    deltas.insert(0, mse(a, Y, deriv=True)*sigmoid(a, deriv=True))  #que tanto se equivoco
+                else:
+                    # error de cada capa... Back Propagation
+                    deltas.insert(0, deltas[0] @ _W.T * sigmoid(a, deriv=True))  # que tanto varia la salida con respecto al error
+
+                _W = self.model[i].W
+            
+                # descenso de gradiente
+                self.model[i].b = self.model[i].b - np.mean(deltas[0], axis=0, keepdims=True) * learnRate
+                self.model[i].W = self.model[i].W - out[i][1].T @ deltas[0] * learnRate
+
+        print('aprendio!!')
 
 
-brain = NeutralNetwork(top=[2, 4, 6])  # 
-print(brain.predict(X=[0,0]))
-print(brain.predict(X=[0,1]))
-print(brain.predict(X=[1,0]))
-print(brain.predict(X=[1,1]))
+def randomPoints(n=100):
+    x = np.random.uniform(0.0, 1.0, n)
+    y = np.random.uniform(0.0, 1.0, n)
+    
+    return np.array([x, y]).T
+
+
+def main():
+    brainXor = NeutralNetwork(top=[2, 4, 1], actFunc=sigmoid)
+
+    X = np.array([
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1],
+        ])
+    Y = np.array([
+        [0],
+        [1],
+        [1],
+        [0],
+        ])
+
+    brainXor.fit(X=X, Y=Y, epochs=10000, learnRate=0.08)
+    
+    xTest = randomPoints(n=3000)
+    yTest = brainXor.predict(xTest)
+    
+    plt.scatter(xTest[:,0], xTest[:,1], c=yTest, s=25, cmap='GnBu')
+    plt.show()
+
+    # circles
+    brainCirc = NeutralNetwork(top=[2, 4, 8, 1], actFunc=sigmoid)
+    X, Y = make_circles(n_samples=500, noise=0.05, factor=0.5)
+    Y = Y.reshape(len(X), 1)
+    
+    brainCirc.fit(X=X, Y=Y, epochs=10000, learnRate=0.05)
+    yTest = brainCirc.predict(X)
+
+    plt.scatter(X[:,0], X[:,1], c=yTest, cmap='winter', s=25)
+    plt.show()
+
+if __name__ == '__main__':
+    main()
